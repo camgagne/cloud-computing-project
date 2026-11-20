@@ -1,10 +1,17 @@
 from aws_cdk import (
-    # Duration,
+    Duration,
+    RemovalPolicy,
     Stack,
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
-    # aws_sqs as sqs,
+    CfnOutput,
+    aws_s3 as s3,
+    aws_cloudfront as cloudfront,
+    aws_cloudfront_origins as origins,
+    aws_s3_deployment as s3deploy,
+    aws_cognito as cognito,
 )
+from aws_cdk.aws_cognito import UserPool
 from constructs import Construct
 
 class Group4ProjectStack(Stack):
@@ -12,29 +19,60 @@ class Group4ProjectStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # The code that defines your stack goes here
 
-        # example resource
-        # queue = sqs.Queue(
-        #     self, "Group4ProjectQueue",
-        #     visibility_timeout=Duration.seconds(300),
+        # user_pool = UserPool(
+        #     self, "UserPool",
+        #     user_pool_name="MyUserPool",
+        #     self_sign_up_enabled=True,
+        #     sign_in_aliases=cognito.SignInAliases(email=True),
+        #     auto_verify=cognito.AutoVerifiedAttrs(email=True),
+        #     password_policy=cognito.PasswordPolicy(
+        #         min_length=8,
+        #         require_lowercase=True,
+        #         require_uppercase=True,
+        #         require_digits=True,
+        #         require_symbols=True,
+        #     ),
+        #     password_policy_recovery=cognito.AccountRecovery.EMAIL_ONLY,
+        #     removal_policy=RemovalPolicy.DESTROY,  # For production, change to RemovalPolicy.RETAIN
         # )
 
-        home_page_function = _lambda.Function(
+        # 1. Create an S3 bucket for the website
+        website_bucket = s3.Bucket(
             self,
-            "HomePageFunction",
-            runtime = _lambda.Runtime.NODEJS_20_X,
-            code = _lambda.Code.from_asset("lambda"),
-            handler = "homePage.handler",
+            "WebsiteBucket",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            # For production, change to RemovalPolicy.RETAIN
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
         )
 
-        api = apigateway.LambdaRestApi(
-            self,
-            "HomePageApi",
-            handler=home_page_function,
-            proxy=False,
+        # 2. Create a CloudFront distribution for the S3 bucket
+        distribution = cloudfront.Distribution(
+            self, "WebsiteDistribution",
+            default_root_object="index.html",
+            default_behavior=cloudfront.BehaviorOptions(
+                # Automatically creates an OAC and attaches the bucket policy
+                origin=origins.S3BucketOrigin.with_origin_access_control(website_bucket),
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
+            ),
         )
 
-        api.root.add_method("GET")
-        home_page_resource = api.root.add_resource("home")
-        home_page_resource.add_method("GET")
+        # 3. Deploy local site files to S3 and invalidate the CloudFront cache
+        s3deploy.BucketDeployment(
+            self, "DeployWebsite",
+            sources=[s3deploy.Source.asset("./website-dist")],  # Path to your built site
+            destination_bucket=website_bucket,
+            distribution=distribution,  # Automatically invalidates CloudFront cache on deploy
+            distribution_paths=["/*"],
+        )
+
+        # 4. Output the live CloudFront URL
+        CfnOutput(
+            self, "DistributionDomainName",
+            value=f"https://{distribution.distribution_domain_name}",
+            description="The URL of the CloudFront distribution",
+        )
