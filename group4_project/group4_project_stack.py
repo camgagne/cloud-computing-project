@@ -41,7 +41,7 @@ class Group4ProjectStack(Stack):
             "WebClient",
             user_pool_client_name="web",
             auth_flows=cognito.AuthFlow(user_srp=True),
-            generate_secret=False,  # public SPA client — no client secret
+            generate_secret=False,
         )
 
         CfnOutput(
@@ -60,7 +60,7 @@ class Group4ProjectStack(Stack):
             description="AWS region for Cognito",
         )
 
-        # 1. Create an S3 bucket for the website
+        # Create an S3 bucket for the website
         website_bucket = s3.Bucket(
             self,
             "WebsiteBucket",
@@ -72,19 +72,18 @@ class Group4ProjectStack(Stack):
             auto_delete_objects=True,
         )
 
-        # 2. Create a CloudFront distribution for the S3 bucket
+        # Create a CloudFront distribution for the S3 bucket
         distribution = cloudfront.Distribution(
             self, "WebsiteDistribution",
             default_root_object="index.html",
             default_behavior=cloudfront.BehaviorOptions(
-                # Automatically creates an OAC and attaches the bucket policy
                 origin=origins.S3BucketOrigin.with_origin_access_control(website_bucket),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
             ),
         )
 
-        # 3. Deploy site + runtime Cognito config (no .env / rebuild needed)
+        # Deploy site + runtime Cognito config
         s3deploy.BucketDeployment(
             self, "DeployWebsite",
             sources=[
@@ -100,20 +99,10 @@ class Group4ProjectStack(Stack):
             distribution_paths=["/*"],
         )
 
-        # 4. Output the live CloudFront URL
+        # Output the live CloudFront URL
         CfnOutput(
             self, "DistributionDomainName",
             value=f"https://{distribution.distribution_domain_name}",
             description="The URL of the CloudFront distribution",
         )
 
-        # Create a bucket for storing images (auth is in place; wire uploads next)
-        # photo_bucket = s3.Bucket(
-        #     self,
-        #     "PhotoAlbumBucket",
-        #     block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-        #     encryption=s3.BucketEncryption.S3_MANAGED,
-        #     enforce_ssl=True,
-        #     removal_policy=RemovalPolicy.DESTROY,
-        #     auto_delete_objects=True,
-        # )
