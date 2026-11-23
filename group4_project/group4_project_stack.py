@@ -16,8 +16,7 @@ class Group4ProjectStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Cognito handles signup / login / email verification for the SPA.
-        # Amplify talks to Cognito directly — no Lambda required for auth.
+        # Cognito handles signup / login / email verification
         user_pool = cognito.UserPool(
             self, "UserPool",
             user_pool_name=f"Group4UserPool-{construct_id}",
