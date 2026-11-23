@@ -76,3 +76,15 @@ class Group4ProjectStack(Stack):
             value=f"https://{distribution.distribution_domain_name}",
             description="The URL of the CloudFront distribution",
         )
+
+        #Create a bucket for storing images 
+        #going to wait on this until we add user auth
+        """photo_bucket = s3.Bucket(
+            self,
+            "PhotoAlbumBucket",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+        )"""
