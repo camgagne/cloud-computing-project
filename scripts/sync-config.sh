@@ -38,6 +38,7 @@ get_output() {
 POOL_ID="$(get_output UserPoolId)"
 CLIENT_ID="$(get_output UserPoolClientId)"
 REGION="$(get_output CognitoRegion)"
+API_URL="$(get_output ApiUrl)"
 
 if [[ -z "$POOL_ID" || "$POOL_ID" == "None" || -z "$CLIENT_ID" || "$CLIENT_ID" == "None" ]]; then
   echo "Could not read Cognito outputs from stack $STACK."
@@ -54,7 +55,8 @@ cat > "$ROOT/frontend/public/config.json" <<EOF
 {
   "userPoolId": "$POOL_ID",
   "userPoolClientId": "$CLIENT_ID",
-  "region": "$REGION"
+  "region": "$REGION",
+  "apiUrl": "$API_URL"
 }
 EOF
 
