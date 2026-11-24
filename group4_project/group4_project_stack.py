@@ -13,6 +13,7 @@ from aws_cdk import (
 )
 from aws_cdk.aws_cognito import UserPool
 from constructs import Construct
+from .init_database import DatabaseConstruct 
 
 class Group4ProjectStack(Stack):
 
@@ -76,3 +77,6 @@ class Group4ProjectStack(Stack):
             value=f"https://{distribution.distribution_domain_name}",
             description="The URL of the CloudFront distribution",
         )
+
+	# database
+        self.db = DatabaseConstruct(self, "Database")
