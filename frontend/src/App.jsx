@@ -4,6 +4,8 @@ import { Hub } from "aws-amplify/utils";
 import AuthPage from "./AuthPage";
 import { configureAuth, isAuthConfigured } from "./amplify";
 import "./App.css";
+import ImageUpload from "./ImageUpload";
+
 
 function Feed({ userLabel, onSignOut }) {
   const [search, setSearch] = useState("");
@@ -53,6 +55,7 @@ function Feed({ userLabel, onSignOut }) {
           <div key={post.id} className="post" title={post.label} />
         ))}
       </main>
+      <ImageUpload />
     </>
   );
 }
@@ -121,5 +124,4 @@ function App() {
 
   return <Feed userLabel={userLabel} onSignOut={handleSignOut} />;
 }
-
 export default App;

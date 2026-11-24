@@ -7,9 +7,19 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
     aws_s3_deployment as s3deploy,
     aws_cognito as cognito,
+    aws_lambda as lambda_,
+    aws_apigatewayv2 as apigw
+)
+
+from aws_cdk.aws_apigatewayv2_authorizers import (
+    HttpUserPoolAuthorizer
+)
+
+from aws_cdk.aws_apigatewayv2_integrations import (
+    HttpLambdaIntegration
 )
 from constructs import Construct
-
+from .init_database import DatabaseConstruct 
 
 class Group4ProjectStack(Stack):
 
@@ -83,22 +93,6 @@ class Group4ProjectStack(Stack):
             ),
         )
 
-        # Deploy site + runtime Cognito config
-        s3deploy.BucketDeployment(
-            self, "DeployWebsite",
-            sources=[
-                s3deploy.Source.asset("./website-dist"),
-                s3deploy.Source.json_data("config.json", {
-                    "userPoolId": user_pool.user_pool_id,
-                    "userPoolClientId": user_pool_client.user_pool_client_id,
-                    "region": Stack.of(self).region,
-                }),
-            ],
-            destination_bucket=website_bucket,
-            distribution=distribution,
-            distribution_paths=["/*"],
-        )
-
         # Output the live CloudFront URL
         CfnOutput(
             self, "DistributionDomainName",
@@ -106,3 +100,128 @@ class Group4ProjectStack(Stack):
             description="The URL of the CloudFront distribution",
         )
 
+        self.db = DatabaseConstruct(self, "Database")
+
+        #s3 bucket for storing images   
+        image_bucket = s3.Bucket(
+            self,
+            "ImageBucket",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            cors=[
+                s3.CorsRule(
+                    #allowed all origins for now, eventually the domain name given from deployment would be here
+                    allowed_origins=["*"],
+                    allowed_methods=[
+                        s3.HttpMethods.PUT,
+                        s3.HttpMethods.GET
+                    ],
+                    allowed_headers=["*"]
+                )
+            ]
+        )
+
+        # Create the Lambda function responsible for generating upload URLs
+        upload_function = lambda_.Function(
+            self,
+            "ImageUploadFunction",
+
+            # Lambda will execute our code using Python 3.12
+            runtime=lambda_.Runtime.PYTHON_3_12,
+
+            # First "handler" refers to handler.py
+            # Second "handler" refers to the function inside handler.py
+            handler="handler.handler",
+
+            # Location of the Lambda source code in our repository
+            code=lambda_.Code.from_asset(
+                "lambda_functions/upload"
+            ),
+
+            # Environment variables
+            environment={
+                "BUCKET_NAME": image_bucket.bucket_name
+            }
+        )
+
+        # Give Lambda permission to upload objects under posts/
+        image_bucket.grant_put(upload_function, "posts/*")  
+
+        # Create an authorizer using our existing Cognito User Pool
+        # This allows API Gateway to verify a user's authentication token
+        authorizer = HttpUserPoolAuthorizer(
+            "UploadAuthorizer",
+
+            # The User Pool already defined earlier in our stack
+            user_pool,
+
+            # Only accept tokens for our existing application client
+            user_pool_clients=[user_pool_client]
+        )
+
+        # Create an HTTP API that our React application can communicate with
+        api = apigw.HttpApi(
+            self,
+            "ProjectApi",
+
+            # Configure CORS for requests from our frontend to the API
+            cors_preflight=apigw.CorsPreflightOptions(
+                #this can be changed when website is fully implemented
+                allow_origins=["*"],
+
+                # Allow POST requests from our frontend
+                allow_methods=[
+                    apigw.CorsHttpMethod.POST
+                ],
+
+                # Allow the frontend to send authentication and JSON data
+                allow_headers=[
+                    "Authorization",
+                    "Content-Type"
+                ]
+            )
+        )
+
+        # Create an endpoint at /upload
+        api.add_routes(
+            path="/upload",
+
+            # This endpoint accepts HTTP POST requests
+            methods=[apigw.HttpMethod.POST],
+
+            # Execute our upload Lambda whenever this endpoint is called
+            integration=HttpLambdaIntegration(
+                "UploadIntegration",
+                upload_function
+            ),
+
+            # Require Cognito authentication before executing Lambda
+            authorizer=authorizer
+        )
+
+        # Output the API URL after deploying the CDK stack
+        CfnOutput(
+            self,
+            "ApiUrl",
+            value=api.api_endpoint,
+            description="API Gateway URL"
+        )
+        #Moved this down to add image upload
+        #Deploy site + runtime Cognito config 
+        s3deploy.BucketDeployment(
+            self,
+            "DeployWebsite",
+            sources=[
+                s3deploy.Source.asset("./website-dist"),
+                s3deploy.Source.json_data("config.json", {
+                    "userPoolId": user_pool.user_pool_id,
+                    "userPoolClientId": user_pool_client.user_pool_client_id,
+                    "region": Stack.of(self).region,
+                    "apiUrl": api.api_endpoint,
+                }),
+            ],
+            destination_bucket=website_bucket,
+            distribution=distribution,
+            distribution_paths=["/*"],
+)
