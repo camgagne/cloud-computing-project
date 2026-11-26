@@ -26,6 +26,9 @@ class Group4ProjectStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # initialize database
+        self.db = DatabaseConstruct(self, "Database")
+
         # Cognito handles signup / login / email verification
         user_pool = cognito.UserPool(
             self, "UserPool",
@@ -70,6 +73,18 @@ class Group4ProjectStack(Stack):
             description="AWS region for Cognito",
         )
 
+        # create lambda function for creating user in dynamo after cognito confirmation
+        post_confirm = lambda_.Function(self, "PostConfirmation",
+        runtime=lambda_.Runtime.PYTHON_3_12,
+        handler="users.init_user.handler",      # backend/users/init_user.py
+        code=lambda_.Code.from_asset("backend"),
+        environment={"USERS_TABLE": self.db.users_table.table_name},
+        )
+        # allow this Lambda to write to the Users table
+        self.db.users_table.grant_write_data(post_confirm)
+        # add lambda as trigger for cognito post confirmation
+        user_pool.add_trigger(cognito.UserPoolOperation.POST_CONFIRMATION, post_confirm)
+
         # Create an S3 bucket for the website
         website_bucket = s3.Bucket(
             self,
@@ -99,8 +114,6 @@ class Group4ProjectStack(Stack):
             value=f"https://{distribution.distribution_domain_name}",
             description="The URL of the CloudFront distribution",
         )
-
-        self.db = DatabaseConstruct(self, "Database")
 
         #s3 bucket for storing images   
         image_bucket = s3.Bucket(
@@ -132,11 +145,15 @@ class Group4ProjectStack(Stack):
 
             # First "handler" refers to handler.py
             # Second "handler" refers to the function inside handler.py
-            handler="handler.handler",
+            # handler="handler.handler",
+            # changed to use create_upload.py instead of handler.py
+            handler="posts.create_upload.handler",
 
             # Location of the Lambda source code in our repository
             code=lambda_.Code.from_asset(
-                "lambda_functions/upload"
+                #"lambda_functions/upload"
+                # changed to use backend instead of lambda_functions/upload
+                "backend"
             ),
 
             # Environment variables
@@ -223,5 +240,24 @@ class Group4ProjectStack(Stack):
             ],
             destination_bucket=website_bucket,
             distribution=distribution,
-            distribution_paths=["/*"],
-)
+            distribution_paths=["/*"],        
+        )
+        
+        # create post using create_post.py lambda function
+        create_post_fn = lambda_.Function(self, "CreatePost",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="posts.create_post.handler",        # backend/posts/create_post.py
+            code=lambda_.Code.from_asset("backend"),
+            environment={"POSTS_TABLE": self.db.posts_table.table_name},
+        )
+        # allow this lambda to write to the Posts table
+        self.db.posts_table.grant_write_data(create_post_fn)
+
+        # connect POST /posts on the API to this Lambda.
+        # the Cognito authorizer rejects requests without a valid login token.
+        api.add_routes(
+            path="/posts",
+            methods=[apigw.HttpMethod.POST],
+            integration=HttpLambdaIntegration("CreatePostIntegration", create_post_fn),
+            authorizer=authorizer,
+        )

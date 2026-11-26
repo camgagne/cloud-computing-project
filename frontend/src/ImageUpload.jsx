@@ -14,6 +14,11 @@ export default function ImageUpload() {
     // Track whether an upload is currently taking place
     const [busy, setBusy] = useState(false);
 
+    // NEW: the caption typed by the user
+    const [caption, setCaption] = useState("");
+
+    // NEW: the saved post, shown after posting
+    const [posted, setPosted] = useState(null);
 
     async function handleUpload() {
 
@@ -93,6 +98,28 @@ export default function ImageUpload() {
                 throw new Error("Image upload failed");
             }
 
+            // NEW: save the post (imageKey + caption) in DynamoDB
+            const postResponse = await fetch(
+                `${config.apiUrl}/posts`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ imageKey, caption })
+                }
+            );
+
+            // NEW: check whether the post was saved
+            if (!postResponse.ok) {
+                throw new Error("Failed to save post");
+            }
+
+            // NEW: keep the saved post plus a local preview of the image
+            const post = await postResponse.json();
+            setPosted({ ...post, preview: URL.createObjectURL(file) });
+
             // Notify the user that the upload succeeded
             setStatus("Image uploaded successfully!");
 
@@ -131,6 +158,14 @@ export default function ImageUpload() {
                 onChange={e => setFile(e.target.files[0])}
             />
 
+            {/* NEW: caption field */}
+            <input
+                placeholder="Caption"
+                value={caption}
+                disabled={busy}
+                onChange={e => setCaption(e.target.value)}
+            />
+
             {/* Execute handleUpload when the button is clicked */}
             <button
                 onClick={handleUpload}
@@ -143,6 +178,15 @@ export default function ImageUpload() {
 
             {/* Display success or error messages */}
             <p>{status}</p>
+
+
+            {/* NEW: show the image and caption that were just posted */}
+            {posted && (
+                <div>
+                    <img src={posted.preview} width="300" />
+                    <p>{posted.caption}</p>
+                </div>
+            )}
 
         </div>
     );
