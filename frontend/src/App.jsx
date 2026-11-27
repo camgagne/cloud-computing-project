@@ -6,11 +6,12 @@ import { configureAuth, isAuthConfigured } from "./amplify";
 import "./App.css";
 import ImageUpload from "./ImageUpload";
 import ProfilePage from "./ProfilePage";
-
+import UserSearch from "./UserSearch";
 
 function Feed({ userLabel, onSignOut }) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState("home")
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   // Old dummy home page post system, for now blank, will eventually replace with feed maybe?
   // const [posts, setPosts] = useState(
@@ -32,12 +33,11 @@ function Feed({ userLabel, onSignOut }) {
   return (
     <>
       <header>
-        <input
-          id="search"
-          type="search"
-          placeholder="Search posts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        <UserSearch
+          onSelectUser={userId => {
+            setSelectedUserId(userId);
+            setView("profile");
+          }}
         />
 
         {/* Open home page */}
@@ -51,7 +51,13 @@ function Feed({ userLabel, onSignOut }) {
         </button>
 
         {/* Open profile page */}
-        <button className="default-btn" onClick={() => setView("profile")}>
+        <button
+          className="default-btn"
+          onClick={() => {
+          setSelectedUserId(null);
+          setView("profile");
+        }}
+        >
           My Profile
         </button>
 
@@ -78,7 +84,7 @@ function Feed({ userLabel, onSignOut }) {
 
       {view === "post" && <ImageUpload />}
 
-      {view === "profile" && <ProfilePage />}
+      {view === "profile" && <ProfilePage userId={selectedUserId} />}
     </>
   );
 }

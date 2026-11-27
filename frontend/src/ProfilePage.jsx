@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
-
-export default function ProfilePage({ onBack }) {
+import "./ProfilePage.css";
+export default function ProfilePage({ userId }) {
     // state for user, posts, error
     const [user, setUser] = useState(null);
     const [posts, setPosts] = useState([]);
@@ -9,6 +9,9 @@ export default function ProfilePage({ onBack }) {
 
     useEffect(() => {
         async function load() {
+            setUser(null);
+            setPosts([]);
+            setError("");
             try {
                 // Retrieve config.json containing our API Gateway URL
                 const config = await fetch("/config.json")
@@ -32,18 +35,20 @@ export default function ProfilePage({ onBack }) {
 
                 // fetch the user and their posts, then set state
 
-                // Get the current user's ID from the Cognito session
-                const { userId } = await getCurrentUser();
+                // Get the currently authenticated user
+                const currentUser = await getCurrentUser();
+
+                // Use the selected user's ID, otherwise use our own ID
+                const profileUserId = userId ?? currentUser.userId;
 
                 // Fetch the user's profile information
                 const userResponse = await fetch(
-                    `${config.apiUrl}/users/${userId}`,
+                    `${config.apiUrl}/users/${profileUserId}`,
                     {
-                        "Authorization": `Bearer ${token}`,
                         method: "GET",
                         headers: {
-                            "Authorization": token,
-                        },
+                        Authorization: `Bearer ${token}`
+                        }
                     }
                 );
                 // Check if the response is OK
@@ -55,13 +60,12 @@ export default function ProfilePage({ onBack }) {
 
                 // Fetch the user's posts
                 const postsResponse = await fetch(
-                    `${config.apiUrl}/users/${userId}/posts`,
+                    `${config.apiUrl}/users/${profileUserId}/posts`,
                     {
-                        "Authorization": `Bearer ${token}`,
                         method: "GET",
                         headers: {
-                            "Authorization": token,
-                        },
+                            Authorization: `Bearer ${token}`
+                        }
                     }
                 );
 
@@ -79,36 +83,102 @@ export default function ProfilePage({ onBack }) {
             }
         }
         load();
-    }, []);
+    }, [userId]);
 
-        return (
-        <div>
-            {/* show error if there is one */}
-            {error && <p className="error">Error: {error}</p>}
-            {user == null ? (<p>Loading user info...</p>) :
-            (
-                <div>
-                    {/* no username yet, use email in meantime
-                    <h2>Username:{user.username}</h2> */}
-                    <h2>Username: {user.email}</h2>
-                    <p>Followers: {user.followerCount}</p>
-                    <p>Following: {user.followingCount}</p>
-                </div>
+    return (
+        <div className="profile-container">
+
+            {/* Profile sidebar */}
+            <aside className="profile-sidebar">
+
+                {user == null ? (
+                    <p>Loading user info...</p>
+                ) : (
+                    <>
+                    <div className="profile-avatar">
+                        {user.username?.charAt(0).toUpperCase()}
+                    </div>
+
+                    <h2 className="profile-email">
+                        {user.username}
+                    </h2>
+
+                    <p className="profile-subtitle">
+                        Community member
+                    </p>
+
+                    <div className="profile-stats">
+
+                        <div className="profile-stat">
+                            <span>Posts</span>
+                            <strong>{posts.length}</strong>
+                        </div>
+
+                        <div className="profile-stat">
+                            <span>Followers</span>
+                            <strong>{user.followerCount}</strong>
+                        </div>
+
+                        <div className="profile-stat">
+                            <span>Following</span>
+                            <strong>{user.followingCount}</strong>
+                        </div>
+
+                    </div>
+
+                    <div className="profile-navigation">
+                        <span className="profile-nav-active">
+                            Posts
+                        </span>
+                    </div>
+                </>
             )}
-            
-            {posts.length == 0 ? (<p>No posts found.</p>) :
-            (
+
+        </aside>
+
+        {/* Main content */}
+        <main className="profile-content">
+
+            <div className="profile-content-header">
+                <h2>Recent activity</h2>
+                <span>{posts.length} posts</span>
+            </div>
+
+            {error && <p className="error">Error: {error}</p>}
+
+            {posts.length === 0 ? (
+                <p className="no-posts">No posts found.</p>
+            ) : (
                 <div className="profile-posts">
+
                     {posts.map(post => (
                         <div key={post.postId} className="profile-post">
-                            {/* Display image, caption, date */}
-                            <img src={post.imageUrl} width="500" />
-                            <p>{post.caption}</p>
-                            <p>{new Date(post.createdAt).toLocaleString()}</p>
+
+                            <img
+                                src={post.imageUrl}
+                                alt="User post"
+                                loading="lazy"
+                            />
+
+                            <div className="profile-post-content">
+
+                                <p className="profile-post-caption">
+                                    {post.caption}
+                                </p>
+
+                                <p className="profile-post-date">
+                                    {new Date(post.createdAt).toLocaleString()}
+                                </p>
+
+                            </div>
                         </div>
                     ))}
+
                 </div>
             )}
-        </div>
+
+        </main>
+
+    </div>
     );
 }

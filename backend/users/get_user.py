@@ -18,7 +18,7 @@ def handler(event, context):
 
     # we'd want to keep user's email private
     # i'll uncomment this if we add usernames, but for now this is fine for testing
-    #user.pop("email", None)
+    user.pop("email", None)
 
     # 200 = "OK"; send the retrieved user back to the frontend
     # default=int converts DynamoDB's Decimal numbers (like followerCount) for JSON
