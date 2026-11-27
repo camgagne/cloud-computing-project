@@ -1,3 +1,4 @@
+# PREVIOUSLY lambda_functions/handler.py
 import boto3
 import json
 import os

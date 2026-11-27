@@ -5,25 +5,29 @@ import AuthPage from "./AuthPage";
 import { configureAuth, isAuthConfigured } from "./amplify";
 import "./App.css";
 import ImageUpload from "./ImageUpload";
+import ProfilePage from "./ProfilePage";
 
 
 function Feed({ userLabel, onSignOut }) {
   const [search, setSearch] = useState("");
-  const [posts, setPosts] = useState(
-    Array.from({ length: 8 }, (_, i) => ({
-      id: i + 1,
-      label: `Post ${i + 1}`,
-    }))
-  );
+  const [view, setView] = useState("home")
 
-  function addPost() {
-    const id = Math.max(0, ...posts.map((p) => p.id)) + 1;
-    setPosts((prev) => [{ id, label: `Post ${id}` }, ...prev]);
-  }
+  // Old dummy home page post system, for now blank, will eventually replace with feed maybe?
+  // const [posts, setPosts] = useState(
+  //   Array.from({ length: 8 }, (_, i) => ({
+  //     id: i + 1,
+  //     label: `Post ${i + 1}`,
+  //   }))
+  // );
 
-  const filteredPosts = posts.filter((post) =>
-    post.label.toLowerCase().includes(search.toLowerCase())
-  );
+  // function addPost() {
+  //   const id = Math.max(0, ...posts.map((p) => p.id)) + 1;
+  //   setPosts((prev) => [{ id, label: `Post ${id}` }, ...prev]);
+  // }
+
+  // const filteredPosts = posts.filter((post) =>
+  //   post.label.toLowerCase().includes(search.toLowerCase())
+  // );
 
   return (
     <>
@@ -36,8 +40,19 @@ function Feed({ userLabel, onSignOut }) {
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        <button id="post-btn" onClick={addPost}>
-          Post
+        {/* Open home page */}
+        <button className="default-btn" onClick={() => setView("home")}>
+          Home
+        </button>
+
+        {/* Open post page (image upload) */}
+        <button className="default-btn" onClick={() => setView("post")}>
+          Create Post
+        </button>
+
+        {/* Open profile page */}
+        <button className="default-btn" onClick={() => setView("profile")}>
+          My Profile
         </button>
 
         <div className="header-user">
@@ -50,12 +65,20 @@ function Feed({ userLabel, onSignOut }) {
         </div>
       </header>
 
-      <main id="posts">
-        {filteredPosts.map((post) => (
-          <div key={post.id} className="post" title={post.label} />
-        ))}
-      </main>
-      <ImageUpload />
+      {/* Show the current page below the header */}
+      {view === "home" && (
+        <p>Home feed coming soon.</p>
+        // also from old dummy home page
+        // <main id="posts">
+        //   {filteredPosts.map((post) => (
+        //     <div key={post.id} className="post" title={post.label} />
+        //   ))}
+        // </main>
+      )}
+
+      {view === "post" && <ImageUpload />}
+
+      {view === "profile" && <ProfilePage />}
     </>
   );
 }

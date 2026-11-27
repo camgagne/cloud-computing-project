@@ -55,6 +55,22 @@
       background: #333;
     }
 
+    .default-btn {
+      padding: 0.65rem 1.25rem;
+      font-size: 1rem;
+      font-family: inherit;
+      border: none;
+      border-radius: 4px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .default-btn:hover {
+      background: #333;
+    }
+
     .header-user {
       display: flex;
       align-items: center;
@@ -112,4 +128,15 @@
 
     .post.hidden {
       display: none;
+    }
+
+    .profile-posts {
+    display: flex;
+    flex-direction: column;   /* stack posts vertically */
+    align-items: center;      /* center them horizontally */
+    gap: 24px;                /* space between posts */
+    }
+
+    .profile-post {
+        text-align: center;       /* center the caption and date under each image */
     }

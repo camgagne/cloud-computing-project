@@ -13,7 +13,7 @@ posts = boto3.resource("dynamodb").Table(os.environ["POSTS_TABLE"])
 def handler(event, context):
     user_id = event["requestContext"]["authorizer"]["jwt"]["claims"]["sub"]
     body = json.loads(event.get("body") or "{}")
-    # get image key and caption
+    # get image and caption
     image_key = body.get("imageKey", "")
     caption = body.get("caption", "")
 

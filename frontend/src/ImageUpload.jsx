@@ -14,10 +14,10 @@ export default function ImageUpload() {
     // Track whether an upload is currently taking place
     const [busy, setBusy] = useState(false);
 
-    // NEW: the caption typed by the user
+    // The caption typed by the user
     const [caption, setCaption] = useState("");
 
-    // NEW: the saved post, shown after posting
+    // The saved post, shown after posting
     const [posted, setPosted] = useState(null);
 
     async function handleUpload() {
@@ -98,7 +98,7 @@ export default function ImageUpload() {
                 throw new Error("Image upload failed");
             }
 
-            // NEW: save the post (imageKey + caption) in DynamoDB
+            // Save the post (imageKey + caption) in DynamoDB
             const postResponse = await fetch(
                 `${config.apiUrl}/posts`,
                 {
@@ -111,12 +111,12 @@ export default function ImageUpload() {
                 }
             );
 
-            // NEW: check whether the post was saved
+            // Check whether the post was saved
             if (!postResponse.ok) {
                 throw new Error("Failed to save post");
             }
 
-            // NEW: keep the saved post plus a local preview of the image
+            // Keep the saved post plus a local preview of the image
             const post = await postResponse.json();
             setPosted({ ...post, preview: URL.createObjectURL(file) });
 
@@ -158,7 +158,7 @@ export default function ImageUpload() {
                 onChange={e => setFile(e.target.files[0])}
             />
 
-            {/* NEW: caption field */}
+            {/* Caption field */}
             <input
                 placeholder="Caption"
                 value={caption}
@@ -173,14 +173,14 @@ export default function ImageUpload() {
                 // Disable if no file is selected or we're uploading
                 disabled={!file || busy}
             >
-                {busy ? "Uploading..." : "Upload Image"}
+                {busy ? "Uploading..." : "Post"}
             </button>
 
             {/* Display success or error messages */}
             <p>{status}</p>
 
 
-            {/* NEW: show the image and caption that were just posted */}
+            {/* Show the image and caption that were just posted */}
             {posted && (
                 <div>
                     <img src={posted.preview} width="300" />
