@@ -73,6 +73,8 @@ class Group4ProjectStack(Stack):
             description="AWS region for Cognito",
         )
 
+
+        # INIT_USER
         # create lambda function for creating user in dynamo after cognito confirmation
         post_confirm = lambda_.Function(self, "PostConfirmation",
         runtime=lambda_.Runtime.PYTHON_3_12,
@@ -84,6 +86,7 @@ class Group4ProjectStack(Stack):
         self.db.users_table.grant_write_data(post_confirm)
         # add lambda as trigger for cognito post confirmation
         user_pool.add_trigger(cognito.UserPoolOperation.POST_CONFIRMATION, post_confirm)
+
 
         # Create an S3 bucket for the website
         website_bucket = s3.Bucket(
@@ -187,9 +190,10 @@ class Group4ProjectStack(Stack):
                 #this can be changed when website is fully implemented
                 allow_origins=["*"],
 
-                # Allow POST requests from our frontend
+                # Allow POST & GET requests
                 allow_methods=[
-                    apigw.CorsHttpMethod.POST
+                    apigw.CorsHttpMethod.POST,
+                    apigw.CorsHttpMethod.GET
                 ],
 
                 # Allow the frontend to send authentication and JSON data
@@ -242,7 +246,10 @@ class Group4ProjectStack(Stack):
             distribution=distribution,
             distribution_paths=["/*"],        
         )
-        
+
+
+
+        # CREATE_POST
         # create post using create_post.py lambda function
         create_post_fn = lambda_.Function(self, "CreatePost",
             runtime=lambda_.Runtime.PYTHON_3_12,
@@ -259,5 +266,66 @@ class Group4ProjectStack(Stack):
             path="/posts",
             methods=[apigw.HttpMethod.POST],
             integration=HttpLambdaIntegration("CreatePostIntegration", create_post_fn),
+            authorizer=authorizer,
+        )
+
+
+
+        # GET_USER
+        # Lambda that returns one user's info, for GET /users/{userId}
+        get_user_fn = lambda_.Function(self, "GetUser",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+
+            # "users.get_user.handler" = backend/users/get_user.py, function handler()
+            handler="users.get_user.handler",
+
+            # Upload the whole backend/ folder as this Lambda's code
+            code=lambda_.Code.from_asset("backend"),
+
+            # Tell the Lambda the real (generated) name of the Users table
+            environment={"USERS_TABLE": self.db.users_table.table_name},
+        )
+
+        # Allow this Lambda to read from the Users table
+        self.db.users_table.grant_read_data(get_user_fn)
+
+        # Connect GET /users/{userId} on the API to this Lambda.
+        # The Cognito authorizer rejects requests without a valid login token.
+        api.add_routes(
+            path="/users/{userId}",
+            methods=[apigw.HttpMethod.GET],
+            integration=HttpLambdaIntegration("GetUserIntegration", get_user_fn),
+            authorizer=authorizer,
+        )
+
+
+
+        # GET_USER_POSTS
+        # Lambda that returns one user's posts, for GET /users/{userId}
+        get_user_posts_fn = lambda_.Function(self, "GetUserPosts",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+
+            # "users.get_user_posts.handler" = backend/users/get_user_posts.py, function handler()
+            handler="users.get_user_posts.handler",
+
+            # Upload the whole backend/ folder as this Lambda's code
+            code=lambda_.Code.from_asset("backend"),
+
+            # Tell the Lambda the real (generated) name of the Posts table
+            environment={"POSTS_TABLE": self.db.posts_table.table_name,
+                          "IMAGE_BUCKET": image_bucket.bucket_name},
+        )
+
+        # Allow this Lambda to read from the Posts table
+        self.db.posts_table.grant_read_data(get_user_posts_fn)
+        # Allow this Lambda to read from the Image bucket
+        image_bucket.grant_read(get_user_posts_fn)
+
+        # Connect GET /users/{userId} on the API to this Lambda.
+        # The Cognito authorizer rejects requests without a valid login token.
+        api.add_routes(
+            path="/users/{userId}/posts",
+            methods=[apigw.HttpMethod.GET],
+            integration=HttpLambdaIntegration("GetUserPostsIntegration", get_user_posts_fn),
             authorizer=authorizer,
         )
