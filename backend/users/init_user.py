@@ -11,7 +11,7 @@ def handler(event, context):
     if event["triggerSource"] == "PostConfirmation_ConfirmSignUp":
         # The new user's info, sent by cognito
         attrs = event["request"]["userAttributes"]
-        username = event["userName"]
+        username = attrs.get("preferred_username", "").strip() or attrs["sub"]
         # create user item in dynamodb
         users.put_item(Item={
             "userId": attrs["sub"],

@@ -40,12 +40,19 @@ function friendlyError(err) {
   if (name === "LimitExceededException" || name === "TooManyRequestsException") {
     return "Too many attempts. Please wait and try again.";
   }
+  if (message.includes("Username is already taken")) {
+  return "That username is already taken. Choose another one.";
+  }
+  if (message.includes("Username must contain")) {
+    return "Username must contain 3–20 letters, numbers, or underscores.";
+  }
   return message;
 }
 
 export default function AuthPage({ onAuthenticated }) {
   const [mode, setMode] = useState(MODES.login);
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -98,7 +105,10 @@ export default function AuthPage({ onAuthenticated }) {
         username: email.trim(),
         password,
         options: {
-          userAttributes: { email: email.trim() },
+          userAttributes: {
+            email: email.trim(),
+            preferred_username: username.trim(),
+          },
         },
       });
       if (result.isSignUpComplete) {
@@ -246,6 +256,23 @@ export default function AuthPage({ onAuthenticated }) {
                 disabled={busy || !configured}
               />
             </label>
+            <label>
+              Username
+              <input
+                type="text"
+                autoComplete="username"
+                required
+                minLength={3}
+                maxLength={20}
+                pattern="[a-zA-Z0-9_]+"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={busy || !configured}
+              />
+            </label>
+            <p className="auth-hint">
+              3–20 characters. Letters, numbers, and underscores only.
+            </p>
             <label>
               Password
               <input

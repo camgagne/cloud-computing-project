@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./ImageUpload.css";
 
 // Retrieve authentication tokens from our existing Cognito session
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -142,52 +143,68 @@ export default function ImageUpload() {
 
 
     return (
-        <div>
+        <div className="upload-card">
 
-            {/* Allow the user to select an image from their computer */}
+        <h2>Create a post</h2>
+        <p className="upload-description">
+            Share a photo with your followers.
+        </p>
+
+        <label className="upload-area">
+            <span className="upload-icon">＋</span>
+
+            <strong>
+                {file ? file.name : "Choose an image"}
+            </strong>
+
+            <span className="upload-hint">
+                JPEG, PNG or WEBP
+            </span>
+
+            <span className="browse-button">
+                Browse files
+            </span>
+
             <input
                 type="file"
-
-                // Suggested file types in the browser's file picker
                 accept="image/jpeg,image/png,image/webp"
-
-                // Disable file selection during an upload
                 disabled={busy}
-
-                // Store the selected file in our React state
                 onChange={e => setFile(e.target.files[0])}
             />
+        </label>
 
-            {/* Caption field */}
-            <input
-                placeholder="Caption"
-                value={caption}
-                disabled={busy}
-                onChange={e => setCaption(e.target.value)}
-            />
+        <label className="caption-label" htmlFor="caption">
+            Caption
+        </label>
 
-            {/* Execute handleUpload when the button is clicked */}
-            <button
-                onClick={handleUpload}
+        <textarea
+            id="caption"
+            className="caption-input"
+            placeholder="Write a caption..."
+            value={caption}
+            disabled={busy}
+            onChange={e => setCaption(e.target.value)}
+        />
 
-                // Disable if no file is selected or we're uploading
-                disabled={!file || busy}
-            >
-                {busy ? "Uploading..." : "Post"}
-            </button>
+        <button
+            className="post-button"
+            onClick={handleUpload}
+            disabled={!file || busy}
+        >
+            {busy ? "Uploading..." : "Create Post"}
+        </button>
 
-            {/* Display success or error messages */}
-            <p>{status}</p>
+        {status && (
+            <p className="upload-status">{status}</p>
+        )}
 
+        {posted && (
+            <div className="posted-preview">
+                <img src={posted.preview} alt="Uploaded post" />
+                <p>{posted.caption}</p>
+            </div>
+        )}
 
-            {/* Show the image and caption that were just posted */}
-            {posted && (
-                <div>
-                    <img src={posted.preview} width="300" />
-                    <p>{posted.caption}</p>
-                </div>
-            )}
-
-        </div>
-    );
+    </div>
+);
 }

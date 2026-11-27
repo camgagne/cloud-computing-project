@@ -73,6 +73,31 @@ class Group4ProjectStack(Stack):
             description="AWS region for Cognito",
         )
 
+        # VALIDATE_USERNAME
+        # Create Lambda to validate usernames before signup
+        validate_username_fn = lambda_.Function(
+            self,
+            "ValidateUsername",
+
+            runtime=lambda_.Runtime.PYTHON_3_12,
+
+            handler="users.validate_username.handler",
+
+            code=lambda_.Code.from_asset("backend"),
+
+            environment={
+                "USERNAMES_TABLE": self.db.usernames_table.table_name
+            }
+        )
+        # Allow Lambda to reserve usernames
+        self.db.usernames_table.grant_write_data(
+            validate_username_fn
+        )
+        # Execute Lambda before Cognito creates an account
+        user_pool.add_trigger(
+            cognito.UserPoolOperation.PRE_SIGN_UP,
+            validate_username_fn
+        )
 
         # INIT_USER
         # create lambda function for creating user in dynamo after cognito confirmation
@@ -328,4 +353,35 @@ class Group4ProjectStack(Stack):
             methods=[apigw.HttpMethod.GET],
             integration=HttpLambdaIntegration("GetUserPostsIntegration", get_user_posts_fn),
             authorizer=authorizer,
+        )
+
+        # Create the Lambda function for searching users
+        search_users_fn = lambda_.Function(
+            self,
+            "SearchUsers",
+
+            runtime=lambda_.Runtime.PYTHON_3_12,
+
+            handler="users.search_users.handler",
+
+            code=lambda_.Code.from_asset("backend"),
+
+            environment={
+                "USERS_TABLE": self.db.users_table.table_name
+            }
+        )
+
+        # Allow Lambda to read from the Users table
+        self.db.users_table.grant_read_data(search_users_fn)
+
+        # Connect GET /users/search to the Lambda function
+        api.add_routes(
+            path="/users/search",
+            methods=[apigw.HttpMethod.GET],
+            integration=HttpLambdaIntegration(
+                "SearchUsersIntegration",
+                search_users_fn
+            ),
+
+            authorizer=authorizer
         )

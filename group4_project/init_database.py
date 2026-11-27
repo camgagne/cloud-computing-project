@@ -38,6 +38,9 @@ class DatabaseConstruct(Construct):
         # Comments: a post's comments, oldest first.
         self.comments_table = self._table("Comments", pk="postId", sk="createdAt")
 
+        # Usernames: reserve unique, case-insensitive usernames
+        self.usernames_table = self._table("Usernames", pk="usernameLower")
+
     # Helper function to create a dynamodb table
     def _table(self, name: str, pk: str, sk: str | None = None) -> dynamodb.Table:
         return dynamodb.Table(
@@ -47,5 +50,4 @@ class DatabaseConstruct(Construct):
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY,             # cdk destroy deletes table
         )
-
 
