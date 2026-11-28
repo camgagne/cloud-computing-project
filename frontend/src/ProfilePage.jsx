@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
 import "./ProfilePage.css";
+
 export default function ProfilePage({ userId }) {
     // state for user, posts, error
     const [user, setUser] = useState(null);
     const [posts, setPosts] = useState([]);
     const [error, setError] = useState("");
+    const [followBusy, setFollowBusy] = useState(false);
 
     useEffect(() => {
         async function load() {
@@ -33,8 +35,6 @@ export default function ProfilePage({ userId }) {
                     throw new Error("You must be signed in");
                 }
 
-                // fetch the user and their posts, then set state
-
                 // Get the currently authenticated user
                 const currentUser = await getCurrentUser();
 
@@ -55,7 +55,7 @@ export default function ProfilePage({ userId }) {
                 if (!userResponse.ok) {
                     throw new Error("Failed to fetch user profile");
                 }
-                
+
                 const userData = await userResponse.json();
 
                 // Fetch the user's posts
@@ -85,6 +85,46 @@ export default function ProfilePage({ userId }) {
         load();
     }, [userId]);
 
+    async function toggleFollow() {
+        if (!user || user.isSelf || followBusy) return;
+
+        setFollowBusy(true);
+        setError("");
+        try {
+            const config = await fetch("/config.json").then((res) => res.json());
+            const session = await fetchAuthSession();
+            const token = session.tokens?.accessToken?.toString();
+            if (!token) {
+                throw new Error("You must be signed in");
+            }
+
+            const action = user.isFollowing ? "unfollow" : "follow";
+            const response = await fetch(
+                `${config.apiUrl}/users/${user.userId}/${action}`,
+                {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            if (!response.ok) {
+                throw new Error(`Failed to ${action} user`);
+            }
+
+            const data = await response.json();
+            setUser((prev) => ({
+                ...prev,
+                isFollowing: data.following,
+                followerCount: data.following
+                    ? Number(prev.followerCount) + 1
+                    : Math.max(0, Number(prev.followerCount) - 1),
+            }));
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setFollowBusy(false);
+        }
+    }
+
     return (
         <div className="profile-container">
 
@@ -106,6 +146,21 @@ export default function ProfilePage({ userId }) {
                     <p className="profile-subtitle">
                         Community member
                     </p>
+
+                    {!user.isSelf && (
+                        <button
+                            type="button"
+                            className={`follow-btn ${user.isFollowing ? "following" : ""}`}
+                            onClick={toggleFollow}
+                            disabled={followBusy}
+                        >
+                            {followBusy
+                                ? "Saving…"
+                                : user.isFollowing
+                                    ? "Following"
+                                    : "Follow"}
+                        </button>
+                    )}
 
                     <div className="profile-stats">
 

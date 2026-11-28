@@ -7,8 +7,9 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
     aws_s3_deployment as s3deploy,
     aws_cognito as cognito,
+    aws_iam as iam,
     aws_lambda as lambda_,
-    aws_apigatewayv2 as apigw
+    aws_apigatewayv2 as apigw,
 )
 
 from aws_cdk.aws_apigatewayv2_authorizers import (
@@ -109,6 +110,12 @@ class Group4ProjectStack(Stack):
         )
         # allow this Lambda to write to the Users table
         self.db.users_table.grant_write_data(post_confirm)
+        # allow this Lambda to create a per-user SNS topic and email-subscribe them
+        # so only that user gets post-created confirmation emails
+        post_confirm.add_to_role_policy(iam.PolicyStatement(
+            actions=["sns:CreateTopic", "sns:Subscribe", "sns:SetTopicAttributes"],
+            resources=["*"],
+        ))
         # add lambda as trigger for cognito post confirmation
         user_pool.add_trigger(cognito.UserPoolOperation.POST_CONFIRMATION, post_confirm)
 
@@ -280,10 +287,20 @@ class Group4ProjectStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="posts.create_post.handler",        # backend/posts/create_post.py
             code=lambda_.Code.from_asset("backend"),
-            environment={"POSTS_TABLE": self.db.posts_table.table_name},
+            environment={
+                "POSTS_TABLE": self.db.posts_table.table_name,
+                "USERS_TABLE": self.db.users_table.table_name,
+            },
         )
         # allow this lambda to write to the Posts table
         self.db.posts_table.grant_write_data(create_post_fn)
+        # allow this lambda to look up the user's SNS topic for the confirmation email
+        self.db.users_table.grant_read_data(create_post_fn)
+        # allow this lambda to publish the post-created confirmation email via SNS
+        create_post_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["sns:Publish"],
+            resources=["*"],
+        ))
 
         # connect POST /posts on the API to this Lambda.
         # the Cognito authorizer rejects requests without a valid login token.
@@ -294,7 +311,28 @@ class Group4ProjectStack(Stack):
             authorizer=authorizer,
         )
 
+        # GET_FEED
+        # Lambda that returns the 10 most recent posts (paginated via nextToken)
+        get_feed_fn = lambda_.Function(self, "GetFeed",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="posts.get_feed.handler",
+            code=lambda_.Code.from_asset("backend"),
+            environment={
+                "POSTS_TABLE": self.db.posts_table.table_name,
+                "USERS_TABLE": self.db.users_table.table_name,
+                "IMAGE_BUCKET": image_bucket.bucket_name,
+            },
+        )
+        self.db.posts_table.grant_read_data(get_feed_fn)
+        self.db.users_table.grant_read_data(get_feed_fn)
+        image_bucket.grant_read(get_feed_fn)
 
+        api.add_routes(
+            path="/posts",
+            methods=[apigw.HttpMethod.GET],
+            integration=HttpLambdaIntegration("GetFeedIntegration", get_feed_fn),
+            authorizer=authorizer,
+        )
 
         # GET_USER
         # Lambda that returns one user's info, for GET /users/{userId}
@@ -308,11 +346,15 @@ class Group4ProjectStack(Stack):
             code=lambda_.Code.from_asset("backend"),
 
             # Tell the Lambda the real (generated) name of the Users table
-            environment={"USERS_TABLE": self.db.users_table.table_name},
+            environment={
+                "USERS_TABLE": self.db.users_table.table_name,
+                "FOLLOWS_TABLE": self.db.follows_table.table_name,
+            },
         )
 
-        # Allow this Lambda to read from the Users table
+        # Allow this Lambda to read from the Users and Follows tables
         self.db.users_table.grant_read_data(get_user_fn)
+        self.db.follows_table.grant_read_data(get_user_fn)
 
         # Connect GET /users/{userId} on the API to this Lambda.
         # The Cognito authorizer rejects requests without a valid login token.
@@ -320,6 +362,46 @@ class Group4ProjectStack(Stack):
             path="/users/{userId}",
             methods=[apigw.HttpMethod.GET],
             integration=HttpLambdaIntegration("GetUserIntegration", get_user_fn),
+            authorizer=authorizer,
+        )
+
+        # FOLLOW_USER
+        follow_user_fn = lambda_.Function(self, "FollowUser",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="users.follow_user.handler",
+            code=lambda_.Code.from_asset("backend"),
+            environment={
+                "USERS_TABLE": self.db.users_table.table_name,
+                "FOLLOWS_TABLE": self.db.follows_table.table_name,
+            },
+        )
+        self.db.users_table.grant_read_write_data(follow_user_fn)
+        self.db.follows_table.grant_write_data(follow_user_fn)
+
+        api.add_routes(
+            path="/users/{userId}/follow",
+            methods=[apigw.HttpMethod.POST],
+            integration=HttpLambdaIntegration("FollowUserIntegration", follow_user_fn),
+            authorizer=authorizer,
+        )
+
+        # UNFOLLOW_USER
+        unfollow_user_fn = lambda_.Function(self, "UnfollowUser",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="users.unfollow_user.handler",
+            code=lambda_.Code.from_asset("backend"),
+            environment={
+                "USERS_TABLE": self.db.users_table.table_name,
+                "FOLLOWS_TABLE": self.db.follows_table.table_name,
+            },
+        )
+        self.db.users_table.grant_read_write_data(unfollow_user_fn)
+        self.db.follows_table.grant_write_data(unfollow_user_fn)
+
+        api.add_routes(
+            path="/users/{userId}/unfollow",
+            methods=[apigw.HttpMethod.POST],
+            integration=HttpLambdaIntegration("UnfollowUserIntegration", unfollow_user_fn),
             authorizer=authorizer,
         )
 

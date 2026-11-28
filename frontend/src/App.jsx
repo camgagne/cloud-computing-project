@@ -4,41 +4,24 @@ import { Hub } from "aws-amplify/utils";
 import AuthPage from "./AuthPage";
 import { configureAuth, isAuthConfigured } from "./amplify";
 import "./App.css";
+import HomeFeed from "./HomeFeed";
 import ImageUpload from "./ImageUpload";
 import ProfilePage from "./ProfilePage";
 import UserSearch from "./UserSearch";
 
 function Feed({ userLabel, onSignOut }) {
-  const [search, setSearch] = useState("");
-  const [view, setView] = useState("home")
+  const [view, setView] = useState("home");
   const [selectedUserId, setSelectedUserId] = useState(null);
 
-  // Old dummy home page post system, for now blank, will eventually replace with feed maybe?
-  // const [posts, setPosts] = useState(
-  //   Array.from({ length: 8 }, (_, i) => ({
-  //     id: i + 1,
-  //     label: `Post ${i + 1}`,
-  //   }))
-  // );
-
-  // function addPost() {
-  //   const id = Math.max(0, ...posts.map((p) => p.id)) + 1;
-  //   setPosts((prev) => [{ id, label: `Post ${id}` }, ...prev]);
-  // }
-
-  // const filteredPosts = posts.filter((post) =>
-  //   post.label.toLowerCase().includes(search.toLowerCase())
-  // );
+  function openProfile(userId) {
+    setSelectedUserId(userId);
+    setView("profile");
+  }
 
   return (
     <>
       <header>
-        <UserSearch
-          onSelectUser={userId => {
-            setSelectedUserId(userId);
-            setView("profile");
-          }}
-        />
+        <UserSearch onSelectUser={openProfile} />
 
         {/* Open home page */}
         <button className="default-btn" onClick={() => setView("home")}>
@@ -54,9 +37,9 @@ function Feed({ userLabel, onSignOut }) {
         <button
           className="default-btn"
           onClick={() => {
-          setSelectedUserId(null);
-          setView("profile");
-        }}
+            setSelectedUserId(null);
+            setView("profile");
+          }}
         >
           My Profile
         </button>
@@ -72,15 +55,7 @@ function Feed({ userLabel, onSignOut }) {
       </header>
 
       {/* Show the current page below the header */}
-      {view === "home" && (
-        <p>Home feed coming soon.</p>
-        // also from old dummy home page
-        // <main id="posts">
-        //   {filteredPosts.map((post) => (
-        //     <div key={post.id} className="post" title={post.label} />
-        //   ))}
-        // </main>
-      )}
+      {view === "home" && <HomeFeed onSelectUser={openProfile} />}
 
       {view === "post" && <ImageUpload />}
 
