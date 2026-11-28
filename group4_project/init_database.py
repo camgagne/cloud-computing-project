@@ -31,6 +31,11 @@ class DatabaseConstruct(Construct):
             index_name="byPostId",             
             partition_key=dynamodb.Attribute(name="postId", type=S),
         )
+        self.posts_table.add_global_secondary_index(  # gsi for the home feed (newest posts first)
+            index_name="byFeed",
+            partition_key=dynamodb.Attribute(name="feedBucket", type=S),
+            sort_key=dynamodb.Attribute(name="createdAt", type=S),
+        )
 
         # Likes: one item per (post, user).
         self.likes_table = self._table("Likes", pk="postId", sk="userId")

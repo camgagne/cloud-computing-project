@@ -53,6 +53,39 @@
     margin: 0;
 }
 
+.follow-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    background: #2563eb;
+    color: #fff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.follow-btn:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.follow-btn.following {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.follow-btn.following:hover:not(:disabled) {
+    background: #fecaca;
+    color: #991b1b;
+}
+
+.follow-btn:disabled {
+    opacity: 0.65;
+    cursor: default;
+}
+
 /* Profile statistics */
 
 .profile-stats {
