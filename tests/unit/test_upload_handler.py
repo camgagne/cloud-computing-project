@@ -6,22 +6,28 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-UPLOAD_DIR = str(Path(__file__).resolve().parents[2] / "lambda_functions" / "upload")
+BACKEND_DIR = str(Path(__file__).resolve().parents[2] / "backend")
 
 
 @pytest.fixture
 def upload_handler(monkeypatch):
     monkeypatch.setenv("BUCKET_NAME", "test-image-bucket")
-    monkeypatch.syspath_prepend(UPLOAD_DIR)
+    monkeypatch.syspath_prepend(BACKEND_DIR)
 
     mock_s3 = MagicMock()
     mock_s3.generate_presigned_url.return_value = "https://s3.example/presigned-put"
 
-    sys.modules.pop("handler", None)
+    for name in list(sys.modules):
+        if name == "posts" or name.startswith("posts."):
+            sys.modules.pop(name, None)
+
     with patch("boto3.client", return_value=mock_s3):
-        handler = importlib.import_module("handler")
+        handler = importlib.import_module("posts.create_upload")
         yield handler, mock_s3
-    sys.modules.pop("handler", None)
+
+    for name in list(sys.modules):
+        if name == "posts" or name.startswith("posts."):
+            sys.modules.pop(name, None)
 
 
 def _event(token_use="access", sub="user-123", body=None):
